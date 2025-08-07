@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rivers of Malawi — Flow & Life</title>
+  <meta name="description" content="Explore the rivers of Malawi: history, ecology, photos and interactive map. Discover Shire, Ruo, Bua and more." />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS for interactive map (open-source, no API key needed) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-XQoYMqMTK8Lp2+o1qK3t3w2u1y6G2Vv8v4bT1x6A6m3q4s9W1q8h1f7wXk3c1q2k" crossorigin=""/>
+
+  <style>
+    /* ========== Variables & Base ========== */
+    :root{
+      --bg-1: #f0f7ff; /* very light blue */
+      --primary: #1f6f8b; /* deep water blue */
+      --accent: #2b8a3e; /* river green */
+      --muted: #6b7280;
+      --card: rgba(255,255,255,0.9);
+      --glass: rgba(255,255,255,0.06);
+      --radius: 14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #eaf6ff 0%, #f7fff4 100%);
+      color:#073b4c;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.4;
+    }
+    a{color:inherit}
+
+    /* ========== Preloader (water ripple) ========== */
+    #preloader{
+      position:fixed;inset:0;background:linear-gradient(180deg, rgba(7,59,76,0.9), rgba(9,105,121,0.8));
+      display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;color:#fff
+    }
+    .ripple {
+      width:120px;height:120px;border-radius:999px;position:relative;
+    }
+    .ripple::before,.ripple::after{
+      content:'';position:absolute;inset:0;border-radius:999px;animation:ripple 2s infinite ease-in-out;
+      box-shadow:0 0 40px rgba(255,255,255,0.08) inset;
+    }
+    .ripple::after{animation-delay:1s;opacity:0.6}
+    @keyframes ripple{
+      0%{transform:scale(.6);opacity:1}
+      100%{transform:scale(1.6);opacity:0}
+    }
+    #preloader h2{font-family:'Playfair Display',serif;margin:16px 0 0;font-size:1.15rem}
+
+    /* ========== Top Navigation ========== */
+    header{
+      position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4));backdrop-filter: blur(6px);
+      box-shadow:0 6px 18px rgba(7,59,76,0.08);
+    }
+    .nav-wrap{max-width:1200px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+    nav{margin-left:auto}
+    nav ul{display:flex;gap:14px;list-style:none;margin:0;padding:0}
+    nav a{padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:600;color:var(--muted);transition:all .22s}
+    nav a:hover{background:var(--glass);color:var(--primary);transform:translateY(-3px)}
+
+    /* ========== Hero ========== */
+    .hero{min-height:70vh;display:grid;grid-template-columns:1fr;align-items:center;padding:120px 20px 40px;max-width:1200px;margin:0 auto}
+    .hero-inner{display:grid;grid-template-columns:1fr 480px;gap:28px;align-items:center}
+    .hero-copy h1{font-family:'Playfair Display',serif;font-size:2.6rem;margin:0 0 10px}
+    .hero-copy p{color:var(--muted);font-size:1.05rem}
+    /* slideshow background */
+    .hero-media{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(12,54,71,0.12)}
+    .slide{width:100%;height:320px;background-size:cover;background-position:center;display:flex;align-items:flex-end;padding:20px;color:white}
+    .slide .caption{background:linear-gradient(180deg, transparent, rgba(0,0,0,0.45));padding:10px;border-radius:8px}
+
+    /* Parallax effect */
+    .parallax{transform:translateY(0);transition:transform .2s}
+
+    /* ========== Filters & Rivers Grid ========== */
+    .section{max-width:1200px;margin:36px auto;padding:0 20px}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+    .controls select,.controls input{padding:10px 12px;border-radius:10px;border:1px solid rgba(7,59,76,0.08);background:transparent}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+    .card{background:var(--card);border-radius:12px;padding:0;overflow:hidden;box-shadow:0 8px 26px rgba(12,54,71,0.08);transition:transform .18s}
+    .card:hover{transform:translateY(-6px)}
+    .card img{width:100%;height:160px;object-fit:cover;display:block}
+    .card-body{padding:12px}
+    .card-body h3{margin:0 0 6px;font-size:1.05rem}
+    .card-body p{margin:0;color:var(--muted);font-size:0.95rem}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--primary),var(--accent));color:white;cursor:pointer}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(3,27,37,0.6);display:none;align-items:center;justify-content:center;padding:24px;z-index:1200}
+    .modal.open{display:flex}
+    .modal-card{max-width:980px;width:100%;background:white;color:#073b4c;border-radius:12px;overflow:auto;max-height:90vh}
+    .modal-hero{height:300px;background-size:cover;background-position:center;border-radius:12px 12px 0 0}
+    .modal-body{padding:18px}
+
+    /* Map */
+    #map{height:420px;border-radius:12px;box-shadow:0 8px 26px rgba(12,54,71,0.08)}
+
+    /* Gallery */
+    .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+    .gallery img{width:100%;height:120px;object-fit:cover;border-radius:8px}
+
+    /* Footer */
+    footer{padding:40px 20px;text-align:center;color:var(--muted)}
+
+    /* responsive tweaks */
+    @media (max-width:980px){
+      .hero-inner{grid-template-columns:1fr}
+      .hero-media{order:-1}
+    }
+
+    /* scroll-to-results float button */
+    .to-top{position:fixed;right:18px;bottom:18px;background:linear-gradient(90deg,var(--primary),var(--accent));color:white;padding:12px;border-radius:999px;box-shadow:0 8px 20px rgba(12,54,71,0.14);cursor:pointer}
+
+    /* subtle ripple on buttons */
+    .btn.ripple{position:relative;overflow:hidden}
+
+    /* small helper */
+    .muted{color:var(--muted)}
+
+  </style>
+</head>
+<body>
+
+  <!-- Preloader -->
+  <div id="preloader" role="status" aria-live="polite">
+    <div class="ripple" aria-hidden="true"></div>
+    <h2>Loading Rivers of Malawi...</h2>
+  </div>
+
+  <!-- Header / Navigation -->
+  <header>
+    <div class="nav-wrap">
+      <div class="brand" aria-hidden="true">
+        <div class="logo">RM</div>
+        <div>
+          <div style="font-weight:700">Rivers of Malawi</div>
+          <div style="font-size:12px;color:var(--muted)">Flow & Life</div>
+        </div>
+      </div>
+      <nav aria-label="Primary">
+        <ul>
+          <li><a href="#home">Home</a></li>
+          <li><a href="#rivers">Rivers</a></li>
+          <li><a href="#map">Map</a></li>
+          <li><a href="#gallery">Gallery</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <main id="home">
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <h1>Explore the Rivers of Malawi</h1>
+          <p>From the mighty Shire to peaceful tributaries — discover the history, ecology and beauty of Malawi's waterways through immersive photos, facts and an interactive map.</p>
+          <div style="margin-top:12px">
+            <button class="btn ripple" id="start-explore">Explore Rivers</button>
+          </div>
+        </div>
+
+        <div class="hero-media parallax" aria-hidden="true">
+          <!-- simple slideshow of background images -->
+          <div id="slide" class="slide" role="img" aria-label="River image caption">
+            <div class="caption"><strong id="slide-title">Shire River</strong><div style="font-size:13px" id="slide-sub">Malawi's major river flowing from Lake Malawi to the Zambezi.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rivers Section -->
+    <section id="rivers" class="section" aria-labelledby="rivers-heading">
+      <h2 id="rivers-heading">Rivers</h2>
+      <div class="controls" role="region" aria-label="Filters">
+        <label>
+          Region
+          <select id="filter-region" aria-label="Filter by region">
+            <option value="all">All Regions</option>
+            <option value="southern">Southern</option>
+            <option value="central">Central</option>
+            <option value="northern">Northern</option>
+          </select>
+        </label>
+        <label>
+          Sort
+          <select id="sort-by" aria-label="Sort rivers">
+            <option value="popular">Most popular</option>
+            <option value="length">By length</option>
+            <option value="name">By name</option>
+          </select>
+        </label>
+        <input id="search" placeholder="Search rivers..." aria-label="Search rivers" />
+      </div>
+
+      <div class="grid" id="rivers-grid" aria-live="polite">
+        <!-- cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- Map Section -->
+    <section id="map" class="section">
+      <h2>Interactive Map</h2>
+      <div id="map" role="application" aria-label="Map showing river locations"></div>
+    </section>
+
+    <!-- Gallery -->
+    <section id="gallery" class="section">
+      <h2>Gallery</h2>
+      <div class="gallery" id="gallery-grid" aria-live="polite">
+        <!-- images injected -->
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="section">
+      <h2>About</h2>
+      <p class="muted">This site is a demo showcase created to highlight Malawi's rivers — their ecological value, cultural significance and role in supporting communities. Images are placeholders; replace with licensed photos for production.</p>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" class="section">
+      <h2>Contact</h2>
+      <p class="muted">For contributions or corrections, please reach out to the site administrator.</p>
+    </section>
+  </main>
+
+  <!-- Modal (river details) -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-card" role="document">
+      <div id="modal-hero" class="modal-hero"></div>
+      <div class="modal-body">
+        <h3 id="modal-title"></h3>
+        <p id="modal-desc" class="muted"></p>
+        <p><strong>Ecology:</strong> <span id="modal-eco"></span></p>
+        <p><strong>Tourism:</strong> <span id="modal-tour"></span></p>
+        <p><strong>Length:</strong> <span id="modal-length"></span></p>
+        <p><strong>Region:</strong> <span id="modal-region"></span></p>
+        <div style="margin-top:12px;text-align:right">
+          <button class="btn" id="modal-close">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating scroll-to-top (water droplet) -->
+  <button class="to-top" id="toTop" aria-label="Scroll to top">💧</button>
+
+  <footer>
+    <div style="max-width:1200px;margin:0 auto;padding:8px 20px;color:var(--muted)">© Rivers of Malawi — Demo • Built with ❤️</div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-qcP4Z8qv3m4yQ8j9mT0sYf1bV+3h2g9s5w1m7c8k3q5p4r6v" crossorigin=""></script>
+
+  <script>
+    /* ------------------ Sample River Data (could come from JSON/API) ------------------ */
+    const rivers = [
+      {
+        id: 'shire', name: 'Shire River', region: 'southern', length_km: 402,
+        coords: [-15.1150, 34.5550], // approximate
+        img: 'https://images.unsplash.com/photo-1509927085850-6a7b7b6c2f3d?auto=format&fit=crop&w=1400&q=60',
+        desc: 'The Shire River flows from Lake Malawi and is the country\'s most important waterway, continuing to the Zambezi.',
+        ecology: 'Supports rich wetlands and diverse fish populations; home to important bird species.',
+        tourism: 'Boating, fishing and scenic lodges along its banks.'
+      },
+      {
+        id: 'ruo', name: 'Ruo River', region: 'southern', length_km: 120,
+        coords: [-16.2900, 35.0220],
+        img: 'https://images.unsplash.com/photo-1545398136-8a9e2f0f4b7d?auto=format&fit=crop&w=1400&q=60',
+        desc: 'Ruo River is a tributary known for rapids and small hydropower sites.',
+        ecology: 'Riverine forest corridors and important aquatic habitats.',
+        tourism: 'Popular for whitewater activities and local cultural sites.'
+      },
+      {
+        id: 'bua', name: 'Bua River', region: 'central', length_km: 80,
+        coords: [-13.9200, 34.0000],
+        img: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1400&q=60',
+        desc: 'A central region river that nourishes agricultural valleys.',
+        ecology: 'Crucial for irrigation and smallholder farming; riverbanks rich in biodiversity.',
+        tourism: 'Scenic day trips; birdwatching.'
+      },
+      {
+        id: 'linthipe', name: 'Linthipe River', region: 'central', length_km: 100,
+        coords: [-13.7000, 33.7833],
+        img: 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=1400&q=60',
+        desc: 'Linthipe flows through central Malawi and is known locally for freshwater fishing.',
+        ecology: 'Supports endemic fish species and riparian forests.',
+        tourism: 'Fishing and community visits.'
+      }
+    ];
+
+    /* ------------------ Utilities ------------------ */
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+
+    /* ------------------ Preloader logic ------------------ */
+    window.addEventListener('load', () => {
+      // keep preloader for a minimum of 1.2s and until images in data are loaded
+      const imgs = rivers.map(r=>{const i=new Image();i.src=r.img;return i});
+      const promises = imgs.map(i => new Promise(res => {i.onload=i.onerror=res}));
+      Promise.all(promises).then(()=>setTimeout(()=>{
+        document.getElementById('preloader').style.display='none';
+      },1200));
+    });
+
+    /* ------------------ Hero slideshow (parallax) ------------------ */
+    const slideEl = document.getElementById('slide');
+    const slideTitle = document.getElementById('slide-title');
+    const slideSub = document.getElementById('slide-sub');
+    let slideIndex = 0;
+    const slides = rivers; // reuse rivers for hero slides
+    function showSlide(i){
+      const r = slides[i%slides.length];
+      slideEl.style.backgroundImage = `url(${r.img})`;
+      slideTitle.textContent = r.name;
+      slideSub.textContent = r.desc;
+    }
+    showSlide(0);
+    setInterval(()=>{slideIndex++;showSlide(slideIndex)},5000);
+
+    // parallax effect on scroll
+    window.addEventListener('scroll',()=>{
+      const hero = document.querySelector('.hero');
+      const par = document.querySelector('.parallax');
+      const rect = hero.getBoundingClientRect();
+      const shift = Math.max(0, -rect.top/8);
+      par.style.transform = `translateY(${shift}px)`;
+    });
+
+    /* ------------------ Render rivers grid ------------------ */
+    const grid = document.getElementById('rivers-grid');
+    function createCard(r){
+      const div = document.createElement('div');div.className='card';
+      div.innerHTML = `
+        <img src="${r.img}" alt="${r.name}" loading="lazy" />
+        <div class="card-body">
+          <h3>${r.name}</h3>
+          <p class="muted">${r.desc.substring(0,120)}...</p>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <small class="muted">${r.length_km} km</small>
+            <button class="btn" data-id="${r.id}">Details</button>
+          </div>
+        </div>
+      `;
+      return div;
+    }
+
+    function renderGrid(list){
+      grid.innerHTML='';
+      list.forEach(r=>grid.appendChild(createCard(r)));
+      // attach detail listeners
+      grid.querySelectorAll('button[data-id]').forEach(b=>b.addEventListener('click',e=>openModal(e.target.dataset.id)));
+    }
+    renderGrid(rivers);
+
+    /* ------------------ Modal details ------------------ */
+    const modal = document.getElementById('modal');
+    function openModal(id){
+      const r = rivers.find(x=>x.id===id);if(!r) return;
+      document.getElementById('modal-hero').style.backgroundImage = `url(${r.img})`;
+      document.getElementById('modal-title').textContent = r.name;
+      document.getElementById('modal-desc').textContent = r.desc;
+      document.getElementById('modal-eco').textContent = r.ecology;
+      document.getElementById('modal-tour').textContent = r.tourism;
+      document.getElementById('modal-length').textContent = r.length_km + ' km';
+      document.getElementById('modal-region').textContent = r.region;
+      modal.classList.add('open');modal.setAttribute('aria-hidden','false');
+    }
+    document.getElementById('modal-close').addEventListener('click',()=>{modal.classList.remove('open');modal.setAttribute('aria-hidden','true')});
+    modal.addEventListener('click',(e)=>{if(e.target===modal){modal.classList.remove('open');modal.setAttribute('aria-hidden','true')}});
+
+    /* ------------------ Leaflet map ------------------ */
+    const map = L.map('map').setView([-14.0,34.0],6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:19,attribution:'© OpenStreetMap contributors'
+    }).addTo(map);
+
+    rivers.forEach(r=>{
+      const marker = L.marker(r.coords).addTo(map);
+      marker.bindPopup(`<strong>${r.name}</strong><br/><img src="${r.img}&w=200" style='width:200px;border-radius:6px;margin-top:6px' alt='${r.name}' loading='lazy'><p style='margin:6px 0 0' class='muted'>${r.desc.substring(0,80)}...</p><button class='btn' onclick="window.open('#rivers')">View</button>`);
+    });
+
+    /* ------------------ Gallery population (lightbox) ------------------ */
+    const gallery = document.getElementById('gallery-grid');
+    rivers.forEach(r=>{
+      const img = document.createElement('img');img.src=r.img;img.alt=r.name;img.loading='lazy';img.tabIndex=0;img.addEventListener('click',()=>openLightbox(r));img.addEventListener('keypress',e=>{if(e.key==='Enter')openLightbox(r)});
+      gallery.appendChild(img);
+    });
+
+    // simple lightbox
+    function openLightbox(r){
+      openModal(r.id);
+      modal.querySelector('.modal-body').scrollIntoView({behavior:'smooth'});
+    }
+
+    /* ------------------ Filters & search ------------------ */
+    $('#filter-region').addEventListener('change',applyFilters);
+    $('#sort-by').addEventListener('change',applyFilters);
+    $('#search').addEventListener('input',applyFilters);
+
+    function applyFilters(){
+      const region = $('#filter-region').value;
+      const sort = $('#sort-by').value;
+      const q = $('#search').value.trim().toLowerCase();
+      let list = rivers.filter(r => (region==='all'||r.region===region) && (r.name.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q)));
+      if(sort==='length') list.sort((a,b)=>b.length_km-a.length_km);
+      if(sort==='name') list.sort((a,b)=>a.name.localeCompare(b.name));
+      renderGrid(list);
+    }
+
+    /* ------------------ Did You Know popup (random fact) ------------------ */
+    const facts = [
+      'The Shire River drains Lake Malawi and connects to the Zambezi River system.',
+      'Malawi\'s rivers support unique freshwater fish species found nowhere else.',
+      'Many communities in Malawi depend on rivers for irrigation and livelihood.'
+    ];
+    function showRandomFact(){
+      if(Math.random()<0.6){ // show 60% of page loads
+        const f = facts[Math.floor(Math.random()*facts.length)];
+        const d = document.createElement('div');d.style.position='fixed';d.style.right='18px';d.style.top='80px';d.style.background='white';d.style.color='#073b4c';d.style.padding='12px 14px';d.style.borderRadius='10px';d.style.boxShadow='0 8px 20px rgba(12,54,71,0.12)';d.innerHTML=`<strong>Did you know?</strong><div style='font-size:.95rem;margin-top:6px'>${f}</div>`;
+        document.body.appendChild(d);
+        setTimeout(()=>d.remove(),7000);
+      }
+    }
+    setTimeout(showRandomFact,1400);
+
+    /* ------------------ Scroll-to-top & nav smooth behavior ------------------ */
+    document.getElementById('toTop').addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+    document.querySelectorAll('header nav a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const id=a.getAttribute('href');document.querySelector(id).scrollIntoView({behavior:'smooth',block:'start'});}));
+
+    /* start explore button */
+    document.getElementById('start-explore').addEventListener('click',()=>document.querySelector('#rivers').scrollIntoView({behavior:'smooth'}));
+
+    /* Accessibility: close modal with escape */
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'){modal.classList.remove('open');modal.setAttribute('aria-hidden','true')}});
+
+    /* ------------------ Smooth scroll to results when modal closed (example of animation when 'time is up') ------------------ */
+    // For our site we treat "results" as the modal body; after modal closes we scroll to grid
+    document.getElementById('modal-close').addEventListener('click',()=>{
+      document.getElementById('rivers-grid').scrollIntoView({behavior:'smooth'});
+    });
+
+  </script>
+</body>
+</html>
